@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from torchtyping import TensorType
 from typing import Union, List
+import math
 
 
 def top_p_filter(logits: TensorType[..., "vocab"], threshold: float = 0.9):
@@ -42,7 +43,7 @@ def remove_tokens_after_eos(tensor, eos_token, image_token):
 
 @torch.no_grad()
 def generate(
-    model: "Magma",
+    model: torch.nn.Module,
     embeddings: TensorType["b", "s", "d"],
     max_steps: int = 100,
     temperature: float = 0.7,
@@ -50,6 +51,7 @@ def generate(
     top_p: float = 0.9,
     eos_token: int = None,
     decode: bool = True,
+    ref: bool = False
 ) -> Union[List[str], TensorType["b", "s"]]:
     """
     Generates captions for a batch of embeddings.
@@ -84,17 +86,21 @@ def generate(
                 past_key_values=past_key_values,
             )
         else:
+            attention_mask = torch.ones(out.shape[:2], dtype=torch.bool, device=out.device) if 'facebook' in model.config.lm_name else None
             # now caching past k/v so we can use only the last token
             outputs = model.lm(
-                input_ids=out[:, -1:], use_cache=True, past_key_values=past_key_values
+                input_ids=out[:, -1:], 
+                attention_mask=attention_mask, 
+                use_cache=True, 
+                past_key_values=past_key_values
             )
 
         logits = outputs.logits[:, -1, :].float()
         past_key_values = outputs.past_key_values
 
         # filter / temperature sample
-        if temperature == 0.0:
-            next_token = torch.argmax(logits, dim=-1)
+        if math.isclose(temperature, 0.0, rel_tol=1e-3):
+            next_token = torch.argmax(logits, dim=-1).view(b,-1)
         else:
             if top_k > 0:
                 logits = top_k_filter(logits, k=top_k)
@@ -104,10 +110,40 @@ def generate(
             probs = F.softmax(logits / temperature, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
-        out = torch.cat((out, next_token), dim=-1)
-
         if eos_token is not None and (next_token == eos_token).all():
             break
+
+        out = torch.cat((out, next_token), dim=-1)
+
+    if ref:
+        for i in range(max_steps):
+            if i == 0:
+                next_token = (torch.zeros((b,1), dtype=torch.long)+torch.LongTensor([4])).to(out.device)
+                out = torch.cat((out, next_token), dim=-1)
+
+                attention_mask = torch.ones(out.shape[:2], dtype=torch.bool, device=out.device) if 'facebook' in model.config.lm_name else None
+                outputs = model.lm(
+                    input_ids=out[:, -2:], 
+                    attention_mask=attention_mask, 
+                    use_cache=True, 
+                    past_key_values=past_key_values
+                )
+            else:
+                attention_mask = torch.ones(out.shape[:2], dtype=torch.bool, device=out.device) if 'facebook' in model.config.lm_name else None
+                outputs = model.lm(
+                    input_ids=out[:, -1:], 
+                    attention_mask=attention_mask, 
+                    use_cache=True, 
+                    past_key_values=past_key_values
+                )
+            logits = outputs.logits[:, -1, :].float()
+            past_key_values = outputs.past_key_values
+            next_token = torch.argmax(logits, dim=-1).view(b,-1)
+
+            if eos_token is not None and (next_token == eos_token).all():
+                break
+
+            out = torch.cat((out, next_token), dim=-1)
 
     if decode:
         captions = []

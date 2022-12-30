@@ -2,16 +2,18 @@ from pathlib import Path
 from os.path import exists
 import torch
 import torch.nn as nn
+import transformers
 from copy import deepcopy
-from typing import Literal, Optional, List
+from typing import Literal, Optional, List, Union
 from torchtyping import TensorType
 from torch.nn.modules.container import ModuleList, Sequential
 from torch.nn.parameter import Parameter
 from transformers.file_utils import ModelOutput
+from transformers import GPTJForCausalLM, OPTForCausalLM
 from magma.config import MultimodalConfig
 
 from magma.utils import get_tokenizer
-from .language_model import get_gptj
+from .language_model import get_lm
 from .adapters import (
     Adapter,
     ParallelAdapter,
@@ -38,21 +40,24 @@ class Magma(nn.Module):
         else:
             assert isinstance(config, MultimodalConfig)
 
-        self.device = device or torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
+        self.device = device or torch.device("cpu")
         self.config = config
-        self.lm = get_gptj(config) #.to(self.device)
-        self.seq_len = self.lm.config.max_position_embeddings
+        self.lm = get_lm(config) #.to(self.device)
+        self.seq_len = self.config.seq_len or self.lm.config.max_position_embeddings
 
-        self.tokenizer = get_tokenizer("gpt2", sequence_length=self.seq_len)
+        self.tokenizer = get_tokenizer(config.tokenizer_name, sequence_length=self.seq_len)
 
         self.image_token = self.tokenizer.cls_token_id
         self.eos_token = self.tokenizer.eos_token_id
+        self.tokenizer.pad_token = self.tokenizer.eos_token
         self.lm.resize_token_embeddings(len(self.tokenizer))
         self.lm.config.pad_token_id = self.tokenizer.eos_token_id
-        self.word_embedding = self.lm.transformer.wte #.to(device)
-        self.transformer = self.lm.transformer.h
+        if type(self.lm) == GPTJForCausalLM:
+            self.word_embedding = self.lm.transformer.wte #.to(device)
+            self.transformer = self.lm.transformer.h
+        elif type(self.lm) == OPTForCausalLM:
+            self.word_embedding = self.lm.model.decoder.embed_tokens #.to(device)
+            self.transformer = self.lm.model.decoder.layers
 
         # adapter settings
         self.mlp_adapter_added, self.attn_adapter_added = False, False
@@ -64,11 +69,16 @@ class Magma(nn.Module):
 
         # might change based on the type of image encoder, so get from prefix instead of config
         self.image_prefix_seq_len = self.image_prefix.out_seq_len
-
+        if hasattr(self.image_prefix.enc, 'input_resolution'):
+            input_resolution = self.image_prefix.enc.input_resolution
+        elif hasattr(self.image_prefix.enc.config, 'input_size'):
+            input_resolution = self.image_prefix.enc.config.input_size
+        else:
+            raise AttributeError
         self.transforms = get_transforms(
             config.image_size,
             config.encoder_name,
-            input_resolution=self.image_prefix.enc.input_resolution,
+            input_resolution=input_resolution,
         )
 
         # add adapters
@@ -237,6 +247,7 @@ class Magma(nn.Module):
         top_k: int = 0,
         top_p: float = 0.9,
         decode: bool = True,
+        ref: bool = False,
     ):
         """
         Generates captions for a batch of embeddings.
@@ -250,19 +261,25 @@ class Magma(nn.Module):
             top_k=top_k,
             top_p=top_p,
             decode=decode,
+            ref=ref
         )
 
     def forward(
         self,
-        images: TensorType["b", "c", "h", "w"] = None,
+        images: Union[TensorType["b", "c", "h", "w"], transformers.tokenization_utils_base.BatchEncoding] = None,
         captions: Optional[TensorType["b", "seq"]] = None,
         output_hidden_states: bool = False,
         input_embeddings: TensorType["b", "s", "d"] = None,
-        inference = False
+        inference: bool = False,
+        ref: bool = False,
     ) -> ModelOutput:
         if inference is True:
+            if type(images) is transformers.tokenization_utils_base.BatchEncoding:
+                batch_size = len(images['input_ids'])
+            else:
+                batch_size = len(images)
             input_embeddings = self.image_prefix(images)
-            asks = [self.tokenizer.encode('Describe the painting:')] * len(images)
+            asks = [self.tokenizer.encode(self.config.ask_string)] * batch_size
             word_embeddings = self.word_embedding(torch.LongTensor(asks).to(self.device))
             input_embeddings = torch.cat(
                 (
@@ -273,9 +290,10 @@ class Magma(nn.Module):
             )
             return self.generate(
                 embeddings = input_embeddings,
-                max_steps = 6,
+                max_steps = 25,
                 temperature = 0.7,
                 top_k = 0,
+                ref = ref,
             )
 
         assert captions is not None, "Must provide captions in training"

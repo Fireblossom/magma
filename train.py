@@ -31,13 +31,13 @@ from magma.train_loop import (
 )
 
 
-def _load_img_cpt_datasets(dataset_dir, tokenizer, transforms):
+def _load_img_cpt_datasets(dataset_dir, tokenizer, transforms, load_data_in_memory=True, config=None):
     if isinstance(dataset_dir, (list, tuple)):
         return ConcatDataset(
             [_load_img_cpt_datasets(d, tokenizer, transforms) for d in dataset_dir]
         )
     elif isinstance(dataset_dir, str):
-        return ImgCptDataset(dataset_dir, tokenizer=tokenizer, transforms=transforms)
+        return ImgCptDataset(dataset_dir, tokenizer=tokenizer, transforms=transforms, load_data_in_memory=load_data_in_memory, encoder_name=config.encoder_name)
     else:
         raise TypeError("dataset dir wrong type")
 
@@ -45,7 +45,7 @@ def _load_img_cpt_datasets(dataset_dir, tokenizer, transforms):
 def get_pretraining_datasets(config, tokenizer, transforms):
     # if config.train_dataset_dir is a list, load all datasets + join together
     train_dataset = _load_img_cpt_datasets(
-        config.train_dataset_dir, tokenizer, transforms
+        config.train_dataset_dir, tokenizer, transforms, load_data_in_memory=True, config=config
     )
     # if no dedicated eval sets are given, use a percentage of the train dataset
     if config.eval_dataset_dir is None:
@@ -57,7 +57,7 @@ def get_pretraining_datasets(config, tokenizer, transforms):
         train_dataset, eval_dataset = random_split(train_dataset, [train_len, eval_len])
     else:
         eval_dataset = _load_img_cpt_datasets(
-            config.eval_dataset_dir, tokenizer, transforms
+            config.eval_dataset_dir, tokenizer, transforms, load_data_in_memory=True, config=config
         )
 
     print_main(f"Loaded train dataset with {len(train_dataset)} samples")
@@ -90,8 +90,8 @@ if __name__ == "__main__":
         config, tokenizer, transforms
     )
 
-    print_main(f"Loaded train dataset with {len(train_dataset)} samples")
-    print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
+    #print_main(f"Loaded train dataset with {len(train_dataset)} samples")
+    #print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
 
     opt = AdamW(
         trainable_parameters,
@@ -135,6 +135,7 @@ if __name__ == "__main__":
     )
     wandb_init(
         project=config.wandb_project,
+        entity=config.entity,
         name=config.name or wandb.util.generate_id(),
         config=config,
     )

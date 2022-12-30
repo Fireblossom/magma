@@ -8,7 +8,7 @@ class Adapter(nn.Module):
         self,
         dim: int,
         downsample_factor: int = 4,
-        activation: nn.Module = nn.ReLU,
+        activation: nn.Module = nn.GELU,
         add_layernorm: bool = False,
     ):
         super().__init__()
@@ -47,7 +47,7 @@ class ParallelAdapter(Adapter):
         downsample_factor: int = 4,
         scaled: bool = False,
         add_layernorm: bool = False,
-        activation: nn.Module = nn.ReLU,
+        activation: nn.Module = nn.GELU,
     ):
         super().__init__(
             dim, downsample_factor, add_layernorm=add_layernorm, activation=activation
@@ -76,7 +76,7 @@ class ParallelAdapterWrapper(ParallelAdapter):
         downsample_factor: int = 4,
         scaled: bool = False,
         add_layernorm: bool = False,
-        activation: nn.Module = nn.ReLU,
+        activation: nn.Module = nn.GELU,
     ):
         super().__init__(
             module, dim, downsample_factor, scaled, add_layernorm, activation
@@ -100,14 +100,14 @@ class AdapterWrapper(Adapter):
         attn_block: nn.Module,
         dim: int,
         downsample_factor: int = 4,
-        activation: nn.Module = nn.ReLU,
+        activation: nn.Module = nn.GELU,
         add_layernorm: bool = False,
     ):
         super().__init__(dim, downsample_factor, activation, add_layernorm)
         self.attn_block = attn_block
 
-    def forward(self, x: TensorType["b", "s", "d"], *attn_args, **attn_kwargs):
-        attn_outputs = self.attn_block(x, *attn_args, **attn_kwargs)
+    def forward(self, hidden_states: TensorType["b", "s", "d"], *attn_args, **attn_kwargs):
+        attn_outputs = self.attn_block(hidden_states, *attn_args, **attn_kwargs)
         attn_output, outputs = (
             attn_outputs[0],
             attn_outputs[1:],

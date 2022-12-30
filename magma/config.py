@@ -55,6 +55,7 @@ class MultimodalConfig:
     train_dataset_dir: str = "/data/coco_data"
     eval_dataset_dir: str = "/data/coco_data"
     eval_dataset_pct: float = 0.1
+    ask_string:str = 'Describe the image:'
 
     # Model architecture:
     # ------------------------------------------------------------
@@ -84,6 +85,7 @@ class MultimodalConfig:
     # Logging settings:
     # ------------------------------------------------------------
     name: str = None  # name, just used for wandb logging
+    entity: str = None
     log_every: int = 1
     wandb_project: str = "magma"
 
@@ -122,7 +124,7 @@ class MultimodalConfig:
                 },
             }
         self.deepspeed_config_params = {
-            "train_batch_size": self.batch_size,
+            "train_micro_batch_size_per_gpu": self.batch_size,
             "gradient_accumulation_steps": self.gradient_accumulation_steps,
             "gradient_clipping": self.gradient_clipping,
             "fp16": {"enabled": True, "loss_scale_window": 250},
