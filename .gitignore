@@ -3,3 +3,6 @@
 *.pyc
 wandb/*
 aws*
+venv/
+dataset/
+checkpoints/

@@ -1,129 +1,46 @@
-# MAGMA -- Multimodal Augmentation of Generative Models through Adapter-based Finetuning
+# Changxu's babbling idea about scientific figures captioning
 
-## Authors
+## Where do the idea comes from?
 
-### repo (alphabetical)
+After I tried the captioning model for photos, I have been trying to find a model that can do the same thing for scientific paper figures.
 
-Constantin (CoEich), Mayukh (Mayukhdeb), Sid (sdtblck)
+Unfortunately, there seems to be none, and the existing similar models are all photo-specific.
+Also, since they are generated very unreliably (like ChatGPT), especially in the scientific domian it is not acceptable.
 
-### paper
+In the paper recommended to me by Wolfgang, we can have the model generate many relevant and irrelevant sentences, and then we label it and boost the model.
 
-Constantin Eichenberg, Sidney Black, Samuel Weinbach, [Aleph Alpha](https://aleph-alpha.com "Independent AI R&D")
+One day Sherry reminded me that there was a workshop on document understanding. 
+At that time I was thinking of writing a GPT-style model that would give hints about sources in sentence keywords (in the form of keyword#1234.5678 with arxiv id).
+This idea was later scrapped because add the id suffix meant we had to add millions of new tokens in the tokenizer (it originally had only ~50,000)
 
-Letitia Parcalabescu, Anette Frank, [Heidelberg University](https://www.cl.uni-heidelberg.de "Computational Linguistics at Heidelberg University")
+Then one day Elena showed me a new model from Facebook, which was trained from many papers. 
+It had the ability to infer the reference source from the article.
+That's the main support of my idea so far.
 
+Also I read some papers about scientific paper figures understanding, such as ChartOCR.
+They focus on extracting the text in the image, such as the range of the data axis.
+So I did OCR on all the figures, and then replaced the model's CNN image encoder with one that encodes both text and image inputs,
+which is LayoutLMv3 so far (but did not work..)
 
-## Abstract
+## Title: TBD
 
-Large-scale pretraining is fast becoming the norm in Vision-Language (VL) modeling. However, prevailing VL approaches are limited by the requirement for labeled data and the use of complex multi-step pretraining objectives. We present MAGMA - a simple method for augmenting generative language models with additional modalities using adapter-based finetuning. Building on Frozen, we train a series of VL models that autoregressively generate text from arbitrary combinations of visual and textual input. The pretraining is entirely end-to-end using a single language modeling objective, simplifying optimization compared to previous approaches. Importantly, the language model weights remain unchanged during training, allowing for transfer of encyclopedic knowledge and in-context learning abilities from language pretraining. MAGMA outperforms Frozen on open-ended generative tasks, achieving state of the art results on the OKVQA benchmark and competitive results on a range of other popular VL benchmarks, while pretraining on 0.2% of the number of samples used to train SimVLM.
+### Hypothsis
 
-Paper on arXiv: https://arxiv.org/abs/2112.05253
+### What I did so far
+- Base on MAGMA framework
+- Replace the LM model
+- Replace the image encoder
+- OCR the SciCap dataset
+- Check dataset
+- Modify the Dataloader that encoding the text information in figures
+- Add paper title information to captions
+- Test forward pass
+- Test generation
+- Check pretrained model loading
+- Fix training loop
+- Reduce the seq_len to less model GRAM usage
+- Test CUDA and checkpointing (59GB GRAM and 98GB checkpointing)
 
-## Examples (via Aleph Alpha playground)
-
- Photos |  Text & Technical
- --- | --- 
- ![A man covering a woman's eyes to hide a present](examples/magma_present.jpg?raw=true "Example_1") |   ![A hand drawn treasure map](examples/magma_treasure.png?raw=true "Example_3")
-![A fallen tree is blocking a road](examples/magma_tree.jpg?raw=true "Example_2")   | ![A software architecture](examples/magma_oracle.png?raw=true "Example_4") 
-
-
- ## Model design
-
-![MAGMA model design](examples/model.jpg?raw=true "MAGMA model design") 
-
-
-## About the repository
-
-In this repository we share the main parts of the codebase for training and inference of our MAGMA VL model. The main use of the repo is for downloading our pretrained weights and interacting with the model. We include a script for data parallel training with Deepspeed for finetuning our models or training a MAGMA model from scratch.
-
-NOTE: The freely available model from this repo is only a demo. For the latest multimodal and multilingual models from Aleph Alpha check out our [website](https://app.aleph-alpha.com "Aleph Alpha").
-
-## Installation
-
-Make sure PyTorch (Ver >= 1.9.0) and Torchvision are installed. See https://pytorch.org/get-started/locally/.
-
-You can pip install from the git repository with:
-
-```bash
-pip install git+https://github.com/Aleph-Alpha/magma.git
-```
-
-Make sure that you also download the config:
-```
-mkdir configs; wget -O configs/MAGMA_v1.yml https://raw.githubusercontent.com/Aleph-Alpha/magma/master/configs/MAGMA_v1.yml
-```
-
-Or if you've cloned the repo, you can install all further requirements by:
-
-```bash
-pip install -r requirements.txt
-```
-
-## Checkpoint
-
-We also publish a model checkpoint that has been used for the publication. It is hosted on our infrastructure and downloads automatically. It can be downloaded manually here: https://bit.ly/aleph_alpha_magma_download 
-	
-This checkpoint can also be [played around with on a space](https://huggingface.co/spaces/EleutherAI/magma) managed by [Heath Mitchell](https://github.com/Heath123), [AK](https://mobile.twitter.com/ak92501), and [Stella Biderman](https://stellabiderman.com). (This is a 3rd party space, not managed by Aleph Alpha.)
-
-## Loading a model for inference
-
-Downloads the checkpoint file into `checkpoint_path` if it's not already present.
-
-```python
-from magma import Magma
-from magma.image_input import ImageInput
-
-model = Magma.from_checkpoint(
-    config_path = "configs/MAGMA_v1.yml",
-    checkpoint_path = "./mp_rank_00_model_states.pt",
-    device = 'cuda:0'
-)
-
-inputs =[
-    ## supports urls and path/to/image
-    ImageInput('https://www.art-prints-on-demand.com/kunst/thomas_cole/woods_hi.jpg'),
-    'Describe the painting:'
-]
-
-## returns a tensor of shape: (1, 149, 4096)
-embeddings = model.preprocess_inputs(inputs)  
-
-## returns a list of length embeddings.shape[0] (batch size)
-output = model.generate(
-    embeddings = embeddings,
-    max_steps = 6,
-    temperature = 0.7,
-    top_k = 0,
-)  
-
-print(output[0]) ##  A cabin on a lake
-```
-
-## Converting datasets to our format
-
-To convert an image-caption dataset to our dataset class `magma.datasets.ImgCptDataset`, we suggest:
-
-```python
-from magma.datasets.convert_datasets import convert_dataset
-
-def my_dataset_iterator():
-    """
-    Implement an iterator for your dataset that for every datapoint yields a tuple
-    image_path, {"captions": [...], "metadata": {...}, }, where image_path is the path to the image as a Path object, captions is a list of caption strings and metadata is an optional field.
-    """
-
-if __name__ == "__main__":
-    convert_dataset(data_dir="/target/directory", ds_iterator=my_dataset_iterator())
-
-```
-
-## How to train MAGMA
-
-Run the training with:
-
-```bash
-deepspeed train.py --config path_to_my_config
-```
-To continue training from a deepspeed checkpoint, provide the checkpoint directory in the "load" config parameter.
-
-WARNING: By default, instantiating magma via the init method instead of from_checkpoint loads the pretrained CLIP weights but not the pretrained gpt-j weights. For training MAGMA from scratch, download the gpt-j weights from this repo: https://github.com/finetuneanon/transformers and include them in the state dict after initializing the MAGMA model.
+### issues, bugs and TODO
+- If a transformer model like ViT and LayoutLMv3 is used as a image encoder, the training loss will drop to 0.0 after about 40 steps.
+- Only one vector for image encoding may not be enough.
