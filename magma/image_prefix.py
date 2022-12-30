@@ -18,6 +18,7 @@ ENCODER_OUT_DIMS = {
     "clip": 512,
     "clip_resnet": 2560,
     "clip_resnet_large": 3072,
+    "layoutlmv3": 768,
 }
 
 
@@ -80,7 +81,11 @@ class ImagePrefix(nn.Module):
     ) -> TensorType["b", "seq", "out_dim"]:
 
         # pass through image encoder
-        logits = self.enc(x)
+        if "layoutlmv3" in self.encoder_type:
+            outputs = self.enc(**x)
+            logits = outputs[0][:, 0, :]
+        else:
+            logits = self.enc(x)
 
         # remove trailing dimensions of size 1 + pass through linear
         if logits.ndim == 4:

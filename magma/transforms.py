@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from PIL import ImageOps
 import PIL
 import random
+import transformers
 
 
 def pad_to_size(x, size=256):
@@ -67,6 +68,11 @@ def get_transforms(
     if "clip" in encoder_name:
         assert input_resolution is not None
         return clip_preprocess(input_resolution)
+    
+    if "layoutlmv3" in encoder_name:
+        processor =  transformers.AutoProcessor.from_pretrained("microsoft/layoutlmv3-base", apply_ocr=False)
+        processor.tokenizer.model_max_length=250
+        return processor
 
     base_transforms = [
         T.Lambda(lambda img: img.convert("RGB") if img.mode != "RGB" else img),

@@ -2,6 +2,7 @@ import torch
 from tqdm import tqdm
 from .utils import reduce_losses, to_cuda_half
 from torchvision.utils import make_grid
+from transformers.tokenization_utils_base import BatchEncoding
 
 
 def train_step(config, train_loader, model_engine):
@@ -9,7 +10,7 @@ def train_step(config, train_loader, model_engine):
 
     for _ in range(config.gradient_accumulation_steps):
         images, captions = next(train_loader)
-        images, captions = images.half().cuda(), captions.cuda()
+        images, captions = to_cuda_half(images, captions)
         if config.run_blind:
             images = torch.zeros_like(images)
         outputs = model_engine(images, captions)
@@ -50,7 +51,7 @@ def eval_step(config, eval_loader, model_engine):
 
     for i in tqdm(range(config.eval_steps), "evaluating..."):
         images, captions = next(eval_loader)
-        images, captions = images.half().cuda(), captions.cuda()
+        images, captions = to_cuda_half(images, captions)
         if config.run_blind:
             images = torch.zeros_like(images)
         outputs = model_engine(images, captions)
@@ -84,14 +85,18 @@ def eval_step_classification(config, train_loader, model_engine, return_accuracy
 
 def inference_step(config, eval_loader, model_engine):
     images, _ = next(eval_loader)
-    images = images.half().cuda()
+    images = to_cuda_half(images)
     if config.run_blind:
         images = torch.zeros_like(images)
     captions = model_engine(
-        images, captions=None, inference=True
+        images, captions=None, inference=True, ref=True,
     )  # [caption1, caption2, ... b]
-    width = min(2, images.shape[0])
-    image_grid = make_grid(images[:width])
+    if isinstance(images, BatchEncoding):
+        width = min(2, images['pixel_values'].shape[0])
+        image_grid = make_grid(images['pixel_values'][:width])
+    else:
+        width = min(2, images.shape[0])
+        image_grid = make_grid(images[:width])
     caption = ""
     for i in range(width):
         caption += f"Caption {i}: \n{captions[i]}\n"

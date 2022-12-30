@@ -1,6 +1,7 @@
 import argparse
 import torch.distributed as dist
-from transformers import GPT2TokenizerFast
+from transformers import GPT2TokenizerFast, AutoTokenizer, OPTForCausalLM
+from transformers.models.opt.modeling_opt import OPTLearnedPositionalEmbedding
 import deepspeed
 from pathlib import Path
 import wandb
@@ -10,6 +11,7 @@ import torch
 from collections import defaultdict
 from torchtyping import TensorType
 import gdown
+from transformers.tokenization_utils_base import BatchEncoding
 
 
 def is_main():
@@ -46,15 +48,26 @@ def get_tokenizer(name="gpt2", sequence_length=2048):
     """
     if name == "gpt2":
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-        tokenizer.padding_side = "right"
-        tokenizer.model_max_length = sequence_length
-        # setup lm settings
-        tokenizer.add_special_tokens(
-            {"cls_token": "<|image|>"}
-        )  # add special image token to tokenizer
     else:
-        raise ValueError(f"Tokenizer {name} not recognized")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(name)
+        except:
+            raise ValueError(f"Tokenizer {name} not recognized")
+            
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+    tokenizer.padding_side = "right"
+    tokenizer.model_max_length = sequence_length
+    # setup lm settings
+    tokenizer.add_special_tokens(
+        {
+            "cls_token": "<|image|>",
+            "pad_token": "</s>",
+            "eos_token": "</s>",
+            "bos_token": "</s>",
+            "unk_token": "</s>",
+        }
+    )  # add special image token to tokenizer
+
     return tokenizer
 
 
@@ -124,9 +137,11 @@ def get_params_for_weight_decay_optimization(module, config):
     """
     weight_decay_params = {"params": []}
     no_weight_decay_params = {"params": [], "weight_decay": 0.0}
-    blacklist_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
-
-    for module_ in module.modules():
+    blacklist_modules = (torch.nn.LayerNorm, torch.nn.Embedding, OPTLearnedPositionalEmbedding)
+    for name_, module_ in module.named_modules():
+        if name_ == 'lm_head' and type(module) is OPTForCausalLM: 
+            # (model.lm.lm_head.weight == model.lm.model.decoder.embed_tokens.weight).all() -> True
+            continue
         if isinstance(module_, blacklist_modules) or (
             config.weight_decay == 0.0
         ):  # also include all parameters here if no weight decay is being done
@@ -313,7 +328,14 @@ def infer_checkpoint_path_from_config(config):
 def to_cuda_half(*args):
     cuda_half_args = []
     for x in args:
-        if isinstance(x, list):
+        if isinstance(x, BatchEncoding):
+            for k in x.keys():
+                if x[k].dtype in [torch.float32, torch.float16]:
+                    x[k] = x[k].half().cuda()
+                elif x[k].dtype == torch.long:
+                    x[k] = x[k].cuda()
+            cuda_half_args.append(x)
+        elif isinstance(x, list):
             x_cuda_half = to_cuda_half(*x)
             cuda_half_args.append(x_cuda_half)
         elif isinstance(x, tuple):
@@ -321,10 +343,9 @@ def to_cuda_half(*args):
             cuda_half_args.append(x_cuda_half)
         else:
             if x.dtype in [torch.float32, torch.float16]:
-                cuda_half_args.append(x.cuda().half())
+                cuda_half_args.append(x.half().cuda())
             elif x.dtype == torch.long:
                 cuda_half_args.append(x.cuda())
-
     if len(cuda_half_args) == 1:
         return cuda_half_args[0]
     else:

@@ -6,6 +6,7 @@ from PIL.Image import DecompressionBombError
 from PIL import UnidentifiedImageError
 import json
 from pathlib import Path
+from transformers.tokenization_utils_base import BatchEncoding
 
 from tqdm import tqdm
 from typing import List, Tuple, Generator
@@ -96,7 +97,7 @@ class ImgCptDataset(Dataset):
     """
 
     def __init__(
-        self, data_dir, tokenizer, transforms, seq_len=2048, load_data_in_memory=False
+        self, data_dir, tokenizer, transforms, seq_len=2048, load_data_in_memory=False, encoder_name=None
     ):
         self.data_dir = Path(data_dir)
         self.tokenizer = tokenizer
@@ -107,6 +108,7 @@ class ImgCptDataset(Dataset):
             self.data = _read_image_data(self.data_dir)
         else:
             self.data = LazyLoader(self.data_dir)
+        self.encoder_name = encoder_name
 
     def __len__(self):
         return len(self.data)
@@ -131,8 +133,16 @@ class ImgCptDataset(Dataset):
                 else:
                     raise e
             img = Image.open(img_path)
-            img_tensor = self.transforms(img)
-            caption = random.choice(img_data["captions"])
+            if not "layoutlmv3" in self.encoder_name:
+                img_tensor = self.transforms(img)
+                caption = random.choice(img_data["captions"])
+            else:
+                # transforms is a layoutlmv3 processor
+                words = img_data["metadata"]["img_text"]
+                bboxes = img_data["metadata"]["bbox"]
+                img_tensor = self.transforms(img, words, boxes=bboxes, return_tensors="pt", padding="max_length", truncation=True, max_length=510)
+                caption = random.choice(img_data["captions"]) + ' [START_REF] ' + img_data["metadata"]["paper_title"] + ' [END_REF]'
+
             caption_tensor = self.tokenizer.encode(
                 caption,
                 return_tensors="pt",
@@ -153,8 +163,17 @@ class ImgCptDataset(Dataset):
 
 
 def collate_fn(batch_data: List[Tuple[torch.Tensor, torch.Tensor]], seq_len=2048):
-
-    all_images, all_captions = list(
-        zip(*batch_data)
-    )  # [(img1, caption1), (img2, caption2), ... ] -> [(img1, img2, ... ), (caption1, caption2, ... )]
-    return torch.cat(all_images), torch.cat([i[:, :seq_len] for i in all_captions])
+    if isinstance(batch_data[0][0], BatchEncoding):
+        batch_captions = [i[1] for i in batch_data]
+        batch_images = [i[0] for i in batch_data]
+        batch_encodings = batch_images[0]
+        for image_encodeing in batch_images[1:]:
+            for k in batch_encodings.keys():
+                #print(type(batch_encodings), type(image_encodeing), k)
+                batch_encodings[k] = torch.cat((batch_encodings[k], image_encodeing[k]), dim=0) 
+        return batch_encodings, torch.cat([i[:, :seq_len] for i in batch_captions])
+    else:
+        all_images, all_captions = list(
+            zip(*batch_data)
+        )  # [(img1, caption1), (img2, caption2), ... ] -> [(img1, img2, ... ), (caption1, caption2, ... )]
+        return torch.cat(all_images), torch.cat([i[:, :seq_len] for i in all_captions])

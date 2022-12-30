@@ -6,6 +6,7 @@ from einops import rearrange
 import timm
 import clip
 from functools import partial
+import transformers
 
 # ----------------------------- Utils --------------------------------------
 
@@ -41,7 +42,7 @@ def nfresnet50(
     pooling = torch.nn.AdaptiveAvgPool2d((1, 1))
     encoder = torch.nn.Sequential(encoder, pooling)
     if device is not None:
-        encoder = encoder.to(device)
+        encoder = encoder# .to(device)
     return encoder
 
 
@@ -62,16 +63,31 @@ def clip_encoder(
     else:
         raise ValueError(f"encoder {name} not recognized")
 
-    encoder = clip.load(name, device=device)[0].visual
+    encoder = clip.load(name, device="cpu")[0].visual
 
     if device is not None:
-        encoder = encoder.to(device)
+        encoder = encoder#.to(device)
 
     if "RN" in name:
         # remove attention pooling
         encoder.attnpool = Lambda(
             partial(rearrange, pattern="b d h w -> b (h w) d")
         )  # remove attn pooling, just use reshaped features
+
+    return encoder
+
+
+def layoutmlv3_encoder(
+    device: Union[torch.device, str] = None, name: str = "layoutlmv3", pretrained: bool = True,
+) -> nn.Module:
+    if pretrained:
+        encoder = transformers.LayoutLMv3Model.from_pretrained("microsoft/layoutlmv3-base")
+    else:
+        config = transformers.LayoutLMv3Config()
+        encoder = transformers.LayoutLMv3Model(config)
+
+    if device is not None:
+        encoder = encoder#.to(device)
 
     return encoder
 
@@ -86,6 +102,8 @@ def get_image_encoder(
         encoder = nfresnet50(device=device, pretrained=pretrained)
     elif "clip" in name:
         encoder = clip_encoder(device=device, name=name)
+    elif "layoutlmv3" in name:
+        encoder = layoutmlv3_encoder(device=device, name=name, pretrained=pretrained)
     else:
         raise ValueError(f"image encoder {name} not recognized")
     return encoder
