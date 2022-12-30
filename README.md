@@ -25,6 +25,7 @@ which is LayoutLMv3 so far (but did not work..)
 ## Title: TBD
 
 ### Hypothsis
+Figure captioning task benefited from transformers based image encoder and reference based feedback training process. 
 
 ### What I did so far
 - Base on MAGMA framework
