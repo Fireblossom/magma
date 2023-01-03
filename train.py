@@ -37,7 +37,7 @@ def _load_img_cpt_datasets(dataset_dir, tokenizer, transforms, load_data_in_memo
             [_load_img_cpt_datasets(d, tokenizer, transforms) for d in dataset_dir]
         )
     elif isinstance(dataset_dir, str):
-        return ImgCptDataset(dataset_dir, tokenizer=tokenizer, transforms=transforms, load_data_in_memory=load_data_in_memory, encoder_name=config.encoder_name)
+        return ImgCptDataset(dataset_dir, tokenizer=tokenizer, transforms=transforms, load_data_in_memory=load_data_in_memory, config=config)
     else:
         raise TypeError("dataset dir wrong type")
 
@@ -90,8 +90,8 @@ if __name__ == "__main__":
         config, tokenizer, transforms
     )
 
-    #print_main(f"Loaded train dataset with {len(train_dataset)} samples")
-    #print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
+    print_main(f"Loaded train dataset with {len(train_dataset)} samples")
+    print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
 
     opt = AdamW(
         trainable_parameters,

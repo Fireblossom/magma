@@ -55,6 +55,7 @@ class MultimodalConfig:
     train_dataset_dir: str = "/data/coco_data"
     eval_dataset_dir: str = "/data/coco_data"
     eval_dataset_pct: float = 0.1
+    cache_prefix:str = None
     ask_string:str = 'Describe the image:'
 
     # Model architecture:

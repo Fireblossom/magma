@@ -14,7 +14,6 @@ import random
 from multiprocessing import Pool, cpu_count
 
 from PIL import Image
-from torch.utils.data import Dataset
 from typing import Tuple
 from torchtyping import TensorType
 import traceback
@@ -58,7 +57,7 @@ def _read_image_data(data_dir):
         desc=f"loading dataset from {str(data_dir)}",
     )
     # read data with multiprocessing
-    with Pool(cpu_count()) as pool:
+    with Pool(min(16,cpu_count())) as pool:
         for img_data in pool.imap(load_json, pbar):
             if img_data is not None:
                 image_data.append(img_data)
@@ -97,7 +96,7 @@ class ImgCptDataset(Dataset):
     """
 
     def __init__(
-        self, data_dir, tokenizer, transforms, seq_len=2048, load_data_in_memory=False, encoder_name=None
+        self, data_dir, tokenizer, transforms, seq_len=2048, load_data_in_memory=False, config=None
     ):
         self.data_dir = Path(data_dir)
         self.tokenizer = tokenizer
@@ -108,7 +107,11 @@ class ImgCptDataset(Dataset):
             self.data = _read_image_data(self.data_dir)
         else:
             self.data = LazyLoader(self.data_dir)
-        self.encoder_name = encoder_name
+        self.config = config
+        if not self.config.cache_prefix is None:
+            self.cache_path = Path('./cache') / self.config.cache_prefix
+            self.cache_path.mkdir(parents=True, exist_ok=True)
+            self.cached = [None]*len(self)
 
     def __len__(self):
         return len(self.data)
@@ -132,15 +135,27 @@ class ImgCptDataset(Dataset):
                     )
                 else:
                     raise e
+            if not self.config.cache_prefix is None:
+                cache_file = self.cache_path / (img_path.name+'.pt')
+                if not self.cached[idx] is None:
+                    img_tensor, caption_tensor = self.cached[idx]
+                    return img_tensor, caption_tensor
+                elif cache_file.is_file():
+                    img_tensor, caption_tensor = torch.load(cache_file)
+                    return img_tensor, caption_tensor
+
             img = Image.open(img_path)
-            if not "layoutlmv3" in self.encoder_name:
+            if not "layoutlmv3" in self.config.encoder_name:
                 img_tensor = self.transforms(img)
-                caption = random.choice(img_data["captions"])
             else:
                 # transforms is a layoutlmv3 processor
                 words = img_data["metadata"]["img_text"]
                 bboxes = img_data["metadata"]["bbox"]
                 img_tensor = self.transforms(img, words, boxes=bboxes, return_tensors="pt", padding="max_length", truncation=True, max_length=510)
+
+            if not "facebook" in self.config.lm_name:
+                caption = random.choice(img_data["captions"])
+            else:
                 caption = random.choice(img_data["captions"]) + ' [START_REF] ' + img_data["metadata"]["paper_title"] + ' [END_REF]'
 
             caption_tensor = self.tokenizer.encode(
@@ -150,6 +165,11 @@ class ImgCptDataset(Dataset):
                 padding="max_length",
                 truncation=True,
             )
+
+            if not self.config.cache_prefix is None:
+                if not cache_file.is_file():
+                    torch.save([img_tensor, caption_tensor], cache_file)
+                    self.cached[idx] = [img_tensor, caption_tensor]
             return img_tensor, caption_tensor
         except (
             UnidentifiedImageError,
