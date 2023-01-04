@@ -11,6 +11,7 @@ from .config import MultimodalConfig
 ENCODER_SEQ_LENS = {
     "clip_resnet": 49,
     "clip_resnet_large": 144,
+    "layoutlmv3": -1 # dummy
 }
 
 ENCODER_OUT_DIMS = {
@@ -83,7 +84,8 @@ class ImagePrefix(nn.Module):
         # pass through image encoder
         if "layoutlmv3" in self.encoder_type:
             outputs = self.enc(**x)
-            logits = outputs[0][:, 0, :]
+            logits = outputs[0] #[:, 0, :]
+            # input OCR + vit [b, 325, 4096]
         else:
             logits = self.enc(x)
 

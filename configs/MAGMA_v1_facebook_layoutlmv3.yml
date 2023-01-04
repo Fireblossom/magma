@@ -2,10 +2,10 @@
     # lm settings
     tokenizer_name: "facebook/galactica-6.7b",
     lm_name: "facebook/galactica-6.7b",
-    seq_len: 256,
+    seq_len: 512,
 
     # image encoder settings
-    encoder_name: 'clip_resnet',
+    encoder_name: 'layoutlmv3',
     freeze_img_encoder: false,
     pretrained_img_encoder: true,
     adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4, "ff_attr": "fc2"}, "attention": {"adapter_type": "normal", "downsample_factor": 4, "attn_attr": "self_attn"}},
@@ -36,7 +36,7 @@
     load: "checkpoints/multimodal_transformer_layoulmv3",
     #save_every: 500,
 
-    eval_every: 2500,
-    name: duan,
+    eval_every: 250,
+    name: duan_layoutlmv3,
     entity: insightsnet,
 }

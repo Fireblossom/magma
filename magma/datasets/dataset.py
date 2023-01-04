@@ -151,7 +151,7 @@ class ImgCptDataset(Dataset):
                 # transforms is a layoutlmv3 processor
                 words = img_data["metadata"]["img_text"]
                 bboxes = img_data["metadata"]["bbox"]
-                img_tensor = self.transforms(img, words, boxes=bboxes, return_tensors="pt", padding="max_length", truncation=True, max_length=510)
+                img_tensor = self.transforms(img, words, boxes=bboxes, return_tensors="pt", padding="max_length", truncation=True, max_length=self.transforms.tokenizer.model_max_length)
 
             if not "facebook" in self.config.lm_name:
                 caption = random.choice(img_data["captions"])

@@ -43,5 +43,5 @@ Figure captioning task benefited from transformers based image encoder and refer
 - Test CUDA and checkpointing (59GB GRAM and 98GB checkpointing)
 
 ### issues, bugs and TODO
-- If a transformer model like ViT and LayoutLMv3 is used as a image encoder, the training loss will drop to 0.0 after about 40 steps.
-- Only one vector for image encoding may not be enough.
+- If a transformer model like ViT and LayoutLMv3 is used as a image encoder, the training loss will drop to 0.0 after about 40 steps. (seems fixed by using full layoutlmv3 output)
+- Only one vector for image encoding may not be enough. (now output vector length is 300+)

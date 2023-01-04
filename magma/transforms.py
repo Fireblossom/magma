@@ -71,7 +71,7 @@ def get_transforms(
     
     if "layoutlmv3" in encoder_name:
         processor =  transformers.AutoProcessor.from_pretrained("microsoft/layoutlmv3-base", apply_ocr=False)
-        processor.tokenizer.model_max_length=250
+        processor.tokenizer.model_max_length=128
         return processor
 
     base_transforms = [
