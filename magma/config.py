@@ -66,6 +66,7 @@ class MultimodalConfig:
     image_seq_len: int = 2
     pretrained_img_encoder: bool = False
     seq_len: int = None
+    image_token_embedding: bool = False
 
     # Layer Freezing settings:
     # ------------------------------------------------------------

@@ -12,6 +12,7 @@ from collections import defaultdict
 from torchtyping import TensorType
 import gdown
 from transformers.tokenization_utils_base import BatchEncoding
+import transformers
 
 
 def is_main():
@@ -142,6 +143,8 @@ def get_params_for_weight_decay_optimization(module, config):
         if name_ == 'lm_head' and type(module) is OPTForCausalLM: 
             # (model.lm.lm_head.weight == model.lm.model.decoder.embed_tokens.weight).all() -> True
             continue
+        if name_ == 'word_embeddings' and type(module) is transformers.models.layoutlmv3.modeling_layoutlmv3.LayoutLMv3TextEmbeddings: 
+            continue
         if isinstance(module_, blacklist_modules) or (
             config.weight_decay == 0.0
         ):  # also include all parameters here if no weight decay is being done
@@ -165,11 +168,12 @@ def get_params_for_weight_decay_optimization(module, config):
         for pn, p in module.named_parameters()
         if p is not None and p.requires_grad
     }
-    assert len(no_weight_decay_params["params"]) + len(
-        weight_decay_params["params"]
-    ) == len(
-        param_dict.keys()
-    ), "Number of params in both groups != total number of trainable params"
+    if not config.image_token_embedding:
+        assert len(no_weight_decay_params["params"]) + len(
+            weight_decay_params["params"]
+        ) == len(
+            param_dict.keys()
+        ), "Number of params in both groups != total number of trainable params"
     if config.weight_decay == 0.0:
         # only return a single param group if no weight decay is being used anyway
         return [no_weight_decay_params]
@@ -204,6 +208,9 @@ def configure_param_groups(model, config):
         # get the params for the lm
         lm_params = get_params_for_weight_decay_optimization(model.lm, config)
 
+        image_token_embedding_params = []
+        if config.image_token_embedding:
+            image_token_embedding_params = get_params_for_weight_decay_optimization(model.image_token_embedding, config)
         # get params for class head if it exists
         class_params = []
         if hasattr(model, "class_head") and model.class_head is not None:
@@ -212,7 +219,7 @@ def configure_param_groups(model, config):
             )
 
         all_params = []
-        for p in image_enc_params + lm_params + image_proj_params + class_params:
+        for p in image_enc_params + lm_params + image_proj_params + class_params + image_token_embedding_params:
             if p["params"]:
                 all_params.append(p)
     else:

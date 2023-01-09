@@ -14,8 +14,8 @@ ds_train = []
 ds_test = []
 ds_val = []
 
-resize_w = 550
-resize_h = 800
+#resize_w = 550
+#resize_h = 800
 
 for file in tqdm(jsons):
     if 'test' in file:
@@ -37,15 +37,16 @@ for file in tqdm(jsons):
         img_path = os.path.join('/home/duan/magma_2/dataset/scicap_data/', 'SciCap-No-Subfig-Img', sub_path, d['figure-ID'])
     
     w, h = d["img_size"]
-    resize_factor =  min(resize_w/w , resize_h/h)
-    assert h*resize_factor < 1000 and w*resize_factor < 1000, 'resize error'
+    resize_factor_w = 1000/w
+    resize_factor_h = 1000/h
+    #assert h*resize_factor_h <= 1000 and w*resize_factor_w <= 1000, 'resize error'
     corners = [i[0] for i in d["img_text"]]
     bbox = []
     for corner in corners:
-        x0 = int(min([i[0] for i in corner])*resize_factor + 100)
-        y0 = int(min([i[1] for i in corner])*resize_factor + 100)
-        x1 = int(max([i[0] for i in corner])*resize_factor + 100)
-        y1 = int(max([i[1] for i in corner])*resize_factor + 100)
+        x0 = int(min([i[0] for i in corner])*resize_factor_w)
+        y0 = int(min([i[1] for i in corner])*resize_factor_h)
+        x1 = int(max([i[0] for i in corner])*resize_factor_w)
+        y1 = int(max([i[1] for i in corner])*resize_factor_h)
         assert max([x0, y0, x1, y1]) < 1000, 'bbox range error'
         bbox.append([x0, y0, x1, y1])
     item = tuple([

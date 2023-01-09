@@ -1,7 +1,11 @@
 from magma import Magma
 import torch
+from magma.utils import cycle, configure_param_groups
 
-model = Magma('configs/MAGMA_v1_layoutlmv3.yml', device=torch.device("cuda:0"))
+model = Magma('configs/MAGMA_v1_facebook_resnet_image_tokens.yml', device=torch.device("cuda:0"))
+
+configure_param_groups(model, model.config)
+exit()
 model = model.half().cuda()
 from train import get_pretraining_datasets
 tokenizer, config, transforms = model.tokenizer, model.config, model.transforms
@@ -11,7 +15,6 @@ train_dataset, eval_dataset = get_pretraining_datasets(
 
 from magma.datasets import collate_fn
 from torch.utils.data import DataLoader
-from magma.utils import cycle
 from functools import partial
 from torchvision.utils import make_grid
 from transformers.tokenization_utils_base import BatchEncoding
@@ -53,7 +56,12 @@ print(outputs)
 
 
 batch_size = len(images['input_ids'])
-input_embeddings = model.image_prefix(images)
+if config.image_token_embedding:
+    image_embeddings = model.image_prefix(images['pixel_values'])
+    image_token_embeddings = model.image_token_embedding(images['input_ids'], images['bbox'])
+    input_embeddings = torch.cat((image_token_embeddings, image_embeddings), dim=1)
+else:
+    input_embeddings = model.image_prefix(images)
 asks = [model.tokenizer.encode('Describe the image:')] * batch_size
 word_embeddings = model.word_embedding(torch.LongTensor(asks).to(model.device))
 input_embeddings = torch.cat(

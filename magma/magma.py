@@ -20,6 +20,7 @@ from .adapters import (
     AdapterWrapper,
     ParallelAdapterWrapper,
 )
+from .image_token_embedding import get_image_token_embedding
 from .image_prefix import ImagePrefix
 from .sampling import generate
 from .utils import build_labels, is_url, print_main, download_checkpoint
@@ -79,7 +80,11 @@ class Magma(nn.Module):
             config.image_size,
             config.encoder_name,
             input_resolution=input_resolution,
+            image_token_embedding=self.config.image_token_embedding
         )
+
+        if self.config.image_token_embedding:
+            self.image_token_embedding = get_image_token_embedding(self.word_embedding)
 
         # add adapters
         if config.adapter_config:
@@ -278,7 +283,12 @@ class Magma(nn.Module):
                 batch_size = len(images['input_ids'])
             else:
                 batch_size = len(images)
-            input_embeddings = self.image_prefix(images)
+            if self.config.image_token_embedding:
+                image_embeddings = self.image_prefix(images['pixel_values'])
+                image_token_embeddings = self.image_token_embedding(images['input_ids'], images['bbox'])
+                input_embeddings = torch.cat((image_token_embeddings, image_embeddings), dim=1)
+            else:
+                input_embeddings = self.image_prefix(images)
             asks = [self.tokenizer.encode(self.config.ask_string)] * batch_size
             word_embeddings = self.word_embedding(torch.LongTensor(asks).to(self.device))
             input_embeddings = torch.cat(
@@ -305,7 +315,12 @@ class Magma(nn.Module):
         ), f"in training, captions should be padded to sequence length ({self.seq_len}), but are length {captions.shape[1]}"
 
         if input_embeddings is None:
-            input_embeddings = self.image_prefix(images)
+            if self.config.image_token_embedding:
+                image_embeddings = self.image_prefix(images['pixel_values'])
+                image_token_embeddings = self.image_token_embedding(images['input_ids'], images['bbox'])
+                input_embeddings = torch.cat((image_token_embeddings, image_embeddings), dim=1)
+            else:
+                input_embeddings = self.image_prefix(images)
         labels = build_labels(
             input_embeddings, captions, self.eos_token, self.device
         )  # build labels from input_embeddings

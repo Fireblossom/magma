@@ -11,7 +11,7 @@ In the paper recommended to me by Wolfgang, we can have the model generate many 
 
 One day Sherry reminded me that there was a workshop on document understanding. 
 At that time I was thinking of writing a GPT-style model that would give hints about sources in sentence keywords (in the form of keyword#1234.5678 with arxiv id).
-This idea was later scrapped because add the id suffix meant we had to add millions of new tokens in the tokenizer (it originally had only ~50,000)
+This idea was later scrapped because add the id suffix meant we had to add millions of new tokens in the tokenizer (it originally has only ~50,000)
 
 Then one day Elena showed me a new model from Facebook, which was trained from many papers. 
 It had the ability to infer the reference source from the article.
@@ -40,8 +40,13 @@ Figure captioning task benefited from transformers based image encoder and refer
 - Check pretrained model loading
 - Fix training loop
 - Reduce the seq_len to less model GRAM usage
-- Test CUDA and checkpointing (59GB GRAM and 98GB checkpointing)
+- Test CUDA and checkpointing (75GB GRAM and 102GB checkpointing)
+- Add 2d embedding for image tokens instead of layoutlmv3 (for they use different tokenizers and has different token embeddings)
 
 ### issues, bugs and TODO
-- If a transformer model like ViT and LayoutLMv3 is used as a image encoder, the training loss will drop to 0.0 after about 40 steps. (seems fixed by using full layoutlmv3 output)
-- Only one vector for image encoding may not be enough. (now output vector length is 300+)
+- [x] If a transformer model like ViT and LayoutLMv3 is used as a image encoder, the training loss will drop to 0.0 after about 40 steps. (seems fixed by using full layoutlmv3 output)
+- [x] Only one vector for image encoding may not be enough. (now output vector length is 300+)
+- [ ] fix assert `get_params_for_weight_decay_optimization`
+- [ ] Concatenate of variable-length tensors (e.g. `<img token> <img token> <pad> <img> <img> <token> <token> <pad> <pad>` to `<img token> <img token> <img> <img> <token> <token> <pad> <pad> <pad>` to give the model a more effective attention mask)
+- [ ] Make alignment between image encoder and image token encoder.
+- [ ] ViT based visual encoder (Some informal discussions have shown that ViT performs lower than ResNet when training resources are lacking)

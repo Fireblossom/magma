@@ -63,8 +63,27 @@ class RandCropResize(object):
 
 
 def get_transforms(
-    image_size, encoder_name, input_resolution=None, use_extra_transforms=False
+    image_size, encoder_name, input_resolution=None, use_extra_transforms=False, image_token_embedding=False
 ):
+    if image_token_embedding:
+        processor =  transformers.AutoProcessor.from_pretrained("microsoft/layoutlmv3-base", apply_ocr=False)
+        processor.tokenizer = transformers.LayoutLMv3TokenizerFast(tokenizer_file='tokenizer.json')
+        processor.tokenizer.pad_token_id = processor.tokenizer.eos_token_id
+        processor.tokenizer.padding_side = "right"
+        # setup lm settings
+        processor.tokenizer.add_special_tokens(
+            {
+                "cls_token": "<|image|>",
+                "pad_token": "</s>",
+                "eos_token": "</s>",
+                "bos_token": "</s>",
+                "unk_token": "</s>",
+            }
+        )  # add special image token to tokenizer
+        processor.tokenizer.model_max_length=128
+        processor.feature_extractor.size = {'height': image_size, 'width': image_size}
+        return processor
+
     if "clip" in encoder_name:
         assert input_resolution is not None
         return clip_preprocess(input_resolution)
