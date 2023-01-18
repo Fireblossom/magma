@@ -21,7 +21,7 @@ def train_step(config, train_loader, model_engine):
 
     return reduce_losses(torch.mean(torch.stack(losses))).item()
 
-
+"""
 def train_step_classification(config, train_loader, model_engine, return_accuracy=True):
     losses = []
     if return_accuracy:
@@ -44,7 +44,7 @@ def train_step_classification(config, train_loader, model_engine, return_accurac
         accuracy_reduced = reduce_losses(torch.mean(torch.stack(accuracies))).item()
         return loss_reduced, accuracy_reduced
     return loss_reduced
-
+"""
 
 def eval_step(config, eval_loader, model_engine):
     losses = []
@@ -60,7 +60,7 @@ def eval_step(config, eval_loader, model_engine):
 
     return reduce_losses(torch.mean(torch.stack(losses))).item()
 
-
+"""
 def eval_step_classification(config, train_loader, model_engine, return_accuracy=True):
     losses = []
     if return_accuracy:
@@ -81,7 +81,7 @@ def eval_step_classification(config, train_loader, model_engine, return_accuracy
         accuracy_reduced = reduce_losses(torch.mean(torch.stack(accuracies))).item()
         return loss_reduced, accuracy_reduced
     return loss_reduced
-
+"""
 
 def inference_step(config, eval_loader, model_engine):
     images, _ = next(eval_loader)
@@ -101,3 +101,19 @@ def inference_step(config, eval_loader, model_engine):
     for i in range(width):
         caption += f"Caption {i}: \n{captions[i]}\n"
     return image_grid, caption
+
+
+def final_inference_step(config, eval_loader, model_engine):
+    images, _ = next(eval_loader)
+    images = to_cuda_half(images)
+    if config.run_blind:
+        images = torch.zeros_like(images)
+    captions = model_engine(
+        images, captions=None, inference=True, ref=True,
+    )  # [caption1, caption2, ... b]
+    if isinstance(images, BatchEncoding):
+        image_grid = make_grid(images['pixel_values'])
+    else:
+        image_grid = make_grid(images)
+
+    return image_grid, captions, _

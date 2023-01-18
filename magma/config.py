@@ -57,6 +57,10 @@ class MultimodalConfig:
     eval_dataset_pct: float = 0.1
     cache_prefix:str = None
     ask_string:str = 'Describe the image:'
+    do_classification: bool = False
+    do_reference: bool = False
+    do_long_caption: bool = False
+    final_infernece: bool = False
 
     # Model architecture:
     # ------------------------------------------------------------

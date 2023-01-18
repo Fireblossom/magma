@@ -300,7 +300,7 @@ class Magma(nn.Module):
             )
             return self.generate(
                 embeddings = input_embeddings,
-                max_steps = 25,
+                max_steps = 128,
                 temperature = 0.7,
                 top_k = 0,
                 ref = ref,

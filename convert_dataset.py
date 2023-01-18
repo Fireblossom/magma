@@ -52,6 +52,7 @@ for file in tqdm(jsons):
     item = tuple([
         Path(img_path), 
         {
+            "subfigure": d["contains-subfigure"],
             "captions": d["2-normalized"]["2-1-basic-num"]["sentence"],
             "metadata":{
                 "paper_title": d["paper_title"],

@@ -153,18 +153,30 @@ class ImgCptDataset(Dataset):
             else:
                 img_tensor = self.transforms(img)
 
-            if not "facebook" in self.config.lm_name:
+            if self.config.do_long_caption:
                 caption = random.choice(img_data["captions"])
             else:
-                caption = random.choice(img_data["captions"]) + ' [START_REF] ' + img_data["metadata"]["paper_title"] + ' [END_REF]'
+                caption = '. '.join(img_data["captions"])
+            
+            if self.config.do_reference:
+                caption += ' [START_REF] ' + img_data["metadata"]["paper_title"] + ' [END_REF] '
 
-            caption_tensor = self.tokenizer.encode(
-                caption,
-                return_tensors="pt",
-                max_length=self.seq_len,
-                padding="max_length",
-                truncation=True,
-            )
+            if self.config.do_classification:
+                if img_data["subfigure"]:
+                    caption += 'This figure has subfigure.'
+                else:
+                    caption += 'This figure does not have subfigure.'
+
+            if self.config.final_infernece:
+                caption_tensor = img_data
+            else:
+                caption_tensor = self.tokenizer.encode(
+                    caption,
+                    return_tensors="pt",
+                    max_length=self.seq_len,
+                    padding="max_length",
+                    truncation=True,
+                )
 
             if not self.config.cache_prefix is None:
                 if not cache_file.is_file():
@@ -183,17 +195,31 @@ class ImgCptDataset(Dataset):
 
 
 def collate_fn(batch_data: List[Tuple[torch.Tensor, torch.Tensor]], seq_len=2048):
-    if isinstance(batch_data[0][0], BatchEncoding):
+    if not isinstance(batch_data[0][1], torch.Tensor):
+        #final_inference
         batch_captions = [i[1] for i in batch_data]
+        captions = [i['captions'] for i in batch_captions]
+        titles = [i["metadata"]['paper_title'] for i in batch_captions]
+        subfigures = [i['subfigure'] for i in batch_captions]
+        batch_captions = {
+            "captions": captions,
+            "titles": titles,
+            "subfigures":subfigures,
+        }
+    else:
+        batch_captions = [i[1] for i in batch_data]
+        batch_captions = torch.cat([i[:, :seq_len] for i in batch_captions])
+
+    if isinstance(batch_data[0][0], BatchEncoding):
         batch_images = [i[0] for i in batch_data]
         batch_encodings = batch_images[0]
         for image_encodeing in batch_images[1:]:
             for k in batch_encodings.keys():
                 #print(type(batch_encodings), type(image_encodeing), k)
                 batch_encodings[k] = torch.cat((batch_encodings[k], image_encodeing[k]), dim=0) 
-        return batch_encodings, torch.cat([i[:, :seq_len] for i in batch_captions])
+        return batch_encodings, batch_captions
     else:
         all_images, all_captions = list(
             zip(*batch_data)
         )  # [(img1, caption1), (img2, caption2), ... ] -> [(img1, img2, ... ), (caption1, caption2, ... )]
-        return torch.cat(all_images), torch.cat([i[:, :seq_len] for i in all_captions])
+        return torch.cat(all_images), batch_captions

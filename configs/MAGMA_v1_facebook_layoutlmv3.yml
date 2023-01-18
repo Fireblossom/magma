@@ -10,6 +10,7 @@
     pretrained_img_encoder: true,
     adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4, "ff_attr": "fc2"}, "attention": {"adapter_type": "normal", "downsample_factor": 4, "attn_attr": "self_attn"}},
     ask_string: 'Describe the figure:',
+    do_reference: true,
 
     # train settings 
     batch_size: 8,
