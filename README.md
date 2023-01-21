@@ -22,7 +22,7 @@ They focus on extracting the text in the image, such as the range of the data ax
 So I did OCR on all the figures, and then replaced the model's CNN image encoder with one that encodes both text and image inputs,
 which is LayoutLMv3 so far (but did not work..)
 
-## Title: TBD
+## Title: Connecting research articles through implicit semantics of scientific figures
 
 ### Hypothsis
 Figure captioning task benefited from transformers based image encoder and reference based feedback training process. 
@@ -46,7 +46,7 @@ Figure captioning task benefited from transformers based image encoder and refer
 ### issues, bugs and TODO
 - [x] If a transformer model like ViT and LayoutLMv3 is used as a image encoder, the training loss will drop to 0.0 after about 40 steps. (seems fixed by using full layoutlmv3 output)
 - [x] Only one vector for image encoding may not be enough. (now output vector length is 300+)
-- [ ] fix assert `get_params_for_weight_decay_optimization`
+- [x] fix assert `get_params_for_weight_decay_optimization`
 - [ ] Concatenate of variable-length tensors (e.g. `<img token> <img token> <pad> <img> <img> <token> <token> <pad> <pad>` to `<img token> <img token> <img> <img> <token> <token> <pad> <pad> <pad>` to give the model a more effective attention mask)
 - [ ] Make alignment between image encoder and image token encoder.
 - [ ] ViT based visual encoder (Some informal discussions have shown that ViT performs lower than ResNet when training resources are lacking)
