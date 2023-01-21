@@ -96,7 +96,6 @@ def generate(
             )
 
         logits = outputs.logits[:, -1, :].float()
-        past_key_values = outputs.past_key_values
 
         # filter / temperature sample
         if math.isclose(temperature, 0.0, rel_tol=1e-3):
@@ -114,6 +113,7 @@ def generate(
             break
 
         out = torch.cat((out, next_token), dim=-1)
+        past_key_values = outputs.past_key_values
 
     if ref:
         for i in range(max_steps):

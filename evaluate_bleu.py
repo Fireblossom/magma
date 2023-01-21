@@ -10,7 +10,7 @@ predictions_title = []
 references_title = []
 
 pattern = r"(\[START_REF\]|\[END_REF\])"
-exp = "multimodal_facebook_resnet"
+exp = "multimodal_transformer_layoulmv3"
 base_path = "checkpoints/"+exp+"/"
 pred_record = set()
 for file in glob.glob(base_path+'test_output.pt*'):
@@ -30,6 +30,7 @@ for file in glob.glob(base_path+'test_output.pt*'):
                 caption_gen = caption_split[0]
                 reference = caption_split[2]
                 class_prediction = None
+                print(caption)
             elif len(re.findall(pattern, caption)) == 0:
                 #caotion toooo long
                 caption_gen = caption_split[0]
@@ -39,6 +40,7 @@ for file in glob.glob(base_path+'test_output.pt*'):
                 caption_gen = caption_split[0]
                 reference = caption_split[-3]
                 class_prediction = caption_split[-1]
+                
             if not id(gold["captions"][idx][0]) in pred_record:
                 predictions_caption.append(caption_gen)
                 references_caption.append(gold["captions"][idx])
