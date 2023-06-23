@@ -9,3 +9,6 @@ deepspeed
 wandb
 accelerate
 galai
+selenium
+seleniumrequests
+evaluate

@@ -9,3 +9,6 @@ checkpoints/
 cache/
 *.pkl
 *.ipynb
+*.json
+*.break
+*.final
