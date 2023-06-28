@@ -38,6 +38,6 @@
     #save_every: 500,
 
     eval_every: 2500,
-    name: duan,
-    entity: insightsnet,
+    name: Anonymous,
+    entity: Anonymous,
 }

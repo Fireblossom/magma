@@ -38,6 +38,6 @@
     #save_every: 500,
 
     eval_every: 250,
-    name: duan_layoutlmv3,
-    entity: insightsnet,
+    name: Anonymous,
+    entity: Anonymous,
 }

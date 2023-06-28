@@ -40,6 +40,6 @@
     #save_every: 500,
 
     eval_every: 250,
-    name: duan_facebook_resnet_image_tokens,
-    entity: insightsnet,
+    name: Anonymous,
+    entity: Anonymous,
 }
