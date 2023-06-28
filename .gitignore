@@ -5,10 +5,13 @@ wandb/*
 aws*
 venv/
 dataset/
-checkpoints/
+**/*.pt
 cache/
 *.pkl
 *.ipynb
 *.json
+!example/*.json
 *.break
 *.final
+*.csv
+*.zip

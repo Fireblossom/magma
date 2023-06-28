@@ -31,9 +31,9 @@
 
     # dataset / save / load settings
     train_dataset_name: 'scicap',
-    train_dataset_dir: '/home/duan/magma/dataset/scicap/train',
+    train_dataset_dir: 'dataset/scicap/train',
     eval_dataset_name: 'scicap',
-    eval_dataset_dir: '/home/duan/magma/dataset/scicap/val',
+    eval_dataset_dir: 'dataset/scicap/val',
     
     save: "checkpoints/multimodal_facebook_resnet_image_tokens",
     load: "checkpoints/multimodal_facebook_resnet_image_tokens",

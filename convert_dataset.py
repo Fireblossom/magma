@@ -32,9 +32,9 @@ for file in tqdm(jsons):
     assert 'paper_title' in d
 
     if d["contains-subfigure"] is True:
-        img_path = os.path.join('/home/duan/magma_2/dataset/scicap_data/', 'SciCap-Yes-Subfig-Img', sub_path, d['figure-ID'])
+        img_path = os.path.join('dataset/scicap_data/', 'SciCap-Yes-Subfig-Img', sub_path, d['figure-ID'])
     else:
-        img_path = os.path.join('/home/duan/magma_2/dataset/scicap_data/', 'SciCap-No-Subfig-Img', sub_path, d['figure-ID'])
+        img_path = os.path.join('dataset/scicap_data/', 'SciCap-No-Subfig-Img', sub_path, d['figure-ID'])
     
     w, h = d["img_size"]
     resize_factor_w = 1000/w
